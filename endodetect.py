@@ -1,19 +1,16 @@
 import os, io, base64, hashlib
 import streamlit as st
 from dotenv import load_dotenv
-from PIL import Image, ImageOps, ImageEnhance, ImageFilter
+from PIL import Image, ImageEnhance
 from streamlit_cropper import st_cropper
 from openai import OpenAI
 
-# Carrega variável de ambiente (local ou Streamlit Cloud)
+# Carregar variável da API key
 load_dotenv()
 SENHA_OPEN_AI = os.getenv("SENHA_OPEN_AI") or st.secrets["SENHA_OPEN_AI"]
 
-# Define a variável de ambiente ANTES de criar o cliente
-os.environ["OPENAI_API_KEY"] = SENHA_OPEN_AI
-
-# Agora pode instanciar o cliente
-client = OpenAI()
+# Instanciar cliente OpenAI de forma compatível com openai>=1.0.0
+client = OpenAI(api_key=SENHA_OPEN_AI)
 
 
 # ---------- Utilitários ----------
