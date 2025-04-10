@@ -5,12 +5,10 @@ from PIL import Image, ImageEnhance
 from streamlit_cropper import st_cropper
 from openai import OpenAI
 
-# Carregar variável da API key
-load_dotenv()
-SENHA_OPEN_AI = os.getenv("SENHA_OPEN_AI") or st.secrets["SENHA_OPEN_AI"]
 
-# Instanciar cliente OpenAI de forma compatível com openai>=1.0.0
-client = OpenAI(api_key=SENHA_OPEN_AI)
+SENHA_OPEN_AI = os.getenv("SENHA_OPEN_AI")
+
+openai.api_key = SENHA_OPEN_AI
 
 
 # ---------- Utilitários ----------
