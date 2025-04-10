@@ -5,10 +5,13 @@ from PIL import Image, ImageOps, ImageEnhance, ImageFilter
 from streamlit_cropper import st_cropper
 from openai import OpenAI
 
-# Carregar variável da API
+# Carrega variável de ambiente (local ou Streamlit Cloud)
 load_dotenv()
 SENHA_OPEN_AI = os.getenv("SENHA_OPEN_AI") or st.secrets["SENHA_OPEN_AI"]
-client = OpenAI(api_key=SENHA_OPEN_AI)
+
+# Inicializa o cliente corretamente (sem usar `api_key=` diretamente)
+client = OpenAI()
+os.environ["OPENAI_API_KEY"] = SENHA_OPEN_AI
 
 # ---------- Utilitários ----------
 def compress_image(img: Image.Image, max_px=900, quality=75) -> bytes:
