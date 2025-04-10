@@ -49,10 +49,9 @@ SYSTEM_PROMPT = (
     "(2) 📊 **Classificação sugestiva da severidade** (leve, moderada ou severa); "
     "(3) 🧾 **Orientação clínica geral** com base em boas práticas. "
     "Use termos como 'sugere-se', 'indicativos de', evitando afirmações absolutas. "
-    "Sempre verifique antes de analisar, se o dente a ser analisado aparece por completo o seu periápice."
-    "A ponta do ápice radicular precisa aparecer na imagem, senão ela precisa ser reinserida pelo usuário"
-    "Sempre forneça uma avaliação."
-    "Se o periápice não estiver visível, oriente o reenvio da imagem. "
+    "Sempre tente realizar a avaliação com base na imagem recebida, mesmo que nem todos os detalhes estejam perfeitamente visíveis. "
+    "Se o periápice estiver parcialmente visível, realize a análise com base no que for possível observar. "
+    "Apenas quando o periápice estiver completamente ausente ou fora da área visível, oriente o reenvio da imagem solicitando que o campo selecionado durante o recorte seja maior. "
     "Finalize com a ressalva de que o laudo é sugestivo, podendo conter erros, e que o diagnóstico definitivo deve ser feito por um cirurgião-dentista."
 )
 
