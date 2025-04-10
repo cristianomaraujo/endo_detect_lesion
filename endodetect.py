@@ -52,7 +52,7 @@ SYSTEM_PROMPT = (
     "Sempre tente realizar a avaliação com base na imagem recebida, mesmo que nem todos os detalhes estejam perfeitamente visíveis. "
     "Se o periápice estiver parcialmente visível, realize a análise com base no que for possível observar. "
     "Apenas quando o periápice estiver completamente ausente ou fora da área visível, oriente o reenvio da imagem solicitando que o campo selecionado durante o recorte seja maior. "
-    "Finalize com a ressalva de que o laudo é sugestivo, podendo conter erros, e que o diagnóstico definitivo deve ser feito por um cirurgião-dentista."
+    "Finalize com a ressalva de que a avaliação é sugestiva, é feita por uma inteligência artificial, podendo conter erros, e que o diagnóstico definitivo deve ser feito por um cirurgião-dentista."
 )
 
 # ---------- Estado inicial ----------
