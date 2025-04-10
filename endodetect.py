@@ -9,9 +9,12 @@ from openai import OpenAI
 load_dotenv()
 SENHA_OPEN_AI = os.getenv("SENHA_OPEN_AI") or st.secrets["SENHA_OPEN_AI"]
 
-# Inicializa o cliente corretamente (sem usar `api_key=` diretamente)
-client = OpenAI()
+# Define a variável de ambiente ANTES de criar o cliente
 os.environ["OPENAI_API_KEY"] = SENHA_OPEN_AI
+
+# Agora pode instanciar o cliente
+client = OpenAI()
+
 
 # ---------- Utilitários ----------
 def compress_image(img: Image.Image, max_px=900, quality=75) -> bytes:
