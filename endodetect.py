@@ -117,7 +117,7 @@ if st.session_state.await_choice:
         else:
             st.session_state.jpeg_bytes = jpeg
             st.session_state.await_choice = False
-            st.success("✅ Imagem salva! Agora clique em **Gerar laudo**.")
+            st.success("✅ Imagem salva! Agora clique em **Gerar avaliação**.")
             st.experimental_rerun()
 
 # ---------- Gerar laudo ----------
