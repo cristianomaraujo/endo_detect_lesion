@@ -1,0 +1,5 @@
+streamlit==1.32.2
+openai==1.14.2
+streamlit-cropper==0.2.1
+pillow==9.5.0
+python-dotenv==1.0.1
