@@ -1,16 +1,13 @@
 import os, io, base64, hashlib
 import streamlit as st
 from dotenv import load_dotenv
-from PIL import Image
-from streamlit_cropper import st_cropper
 from PIL import Image, ImageOps, ImageEnhance, ImageFilter
+from streamlit_cropper import st_cropper
 from openai import OpenAI
 
-
-# Carregar variáveis do .env
+# Carregar variável da API
 load_dotenv()
-SENHA_OPEN_AI = os.getenv("SENHA_OPEN_AI")
-openai.api_key = SENHA_OPEN_AI
+SENHA_OPEN_AI = os.getenv("SENHA_OPEN_AI") or st.secrets["SENHA_OPEN_AI"]
 client = OpenAI(api_key=SENHA_OPEN_AI)
 
 # ---------- Utilitários ----------
