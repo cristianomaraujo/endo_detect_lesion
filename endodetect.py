@@ -5,11 +5,11 @@ from PIL import Image
 from streamlit_cropper import st_cropper
 from PIL import Image, ImageOps, ImageEnhance, ImageFilter
 from openai import OpenAI
-os.environ["OPENAI_API_KEY"] = SENHA_OPEN_AI
 
-from openai import OpenAI
+# Carregar variáveis do .env
+load_dotenv()
+os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
 client = OpenAI()
-
 # ---------- Utilitários ----------
 def compress_image(img: Image.Image, max_px=900, quality=75) -> bytes:
     w, h = img.size
