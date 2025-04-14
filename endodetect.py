@@ -1,9 +1,14 @@
-import os, io, base64, hashlib
+import os, io, base64
 import streamlit as st
 from dotenv import load_dotenv
-from PIL import Image, ImageEnhance
+from PIL import Image, ImageEnhance, ImageDraw
 from streamlit_cropper import st_cropper
+from streamlit_drawable_canvas import st_canvas
+import numpy as np
+import cv2
 from openai import OpenAI
+from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
+import av
 
 # Carrega a variável da API
 load_dotenv()
