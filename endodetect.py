@@ -13,6 +13,15 @@ SENHA_OPEN_AI = os.getenv("SENHA_OPEN_AI") or st.secrets["SENHA_OPEN_AI"]
 client = OpenAI(api_key=SENHA_OPEN_AI)
 
 
+# ---------- Webcam ----------
+class CameraTransformer(VideoTransformerBase):
+    def __init__(self):
+        self.frame = None
+
+    def transform(self, frame):
+        self.frame = frame.to_ndarray(format="bgr24")
+        return frame
+
 # ---------- Utilitários ----------
 def compress_image(img: Image.Image, max_px=900, quality=75) -> bytes:
     w, h = img.size
@@ -131,12 +140,29 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# ---------- Upload ----------
-uploaded = st.file_uploader("Radiografia periapical (JPG/PNG)", type=["jpg", "jpeg", "png"])
+# ---------- Câmera ----------
+st.subheader("📷 Tirar foto com a câmera")
+camera_ctx = webrtc_streamer(
+    key="camera",
+    video_transformer_factory=CameraTransformer,
+    media_stream_constraints={"video": True, "audio": False},
+    async_processing=False,
+)
 
+if camera_ctx and camera_ctx.video_transformer:
+    frame = camera_ctx.video_transformer.frame
+    if frame is not None:
+        st.image(frame, caption="Imagem capturada", channels="BGR")
+        if st.button("📸 Usar esta imagem"):
+            img_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            st.session_state.crop_image = img_pil
+            st.experimental_rerun()
+
+# ---------- Upload ----------
+uploaded = st.file_uploader("📁 Ou envie uma imagem de radiografia (JPG/PNG)", type=["jpg", "jpeg", "png"])
 if uploaded and st.session_state.jpeg_bytes is None:
     img_orig = Image.open(uploaded).convert("RGB")
-    st.write("🔍 Ajuste o recorte ao dente de interesse e clique em **Confirmar recorte**. A imagem deve conter toda **região periapical e o osso adjacente**, de forma que **possibilite a avaliação**")
+    st.write("🔍 Ajuste o recorte ao dente de interesse e clique em **Confirmar recorte**.")
     cropped_img = st_cropper(img_orig, aspect_ratio=(2, 3), box_color="#27AE60", realtime_update=True, return_type="image", key="cropper")
     if st.button("Confirmar recorte"):
         st.session_state.crop_image = cropped_img
@@ -144,7 +170,6 @@ if uploaded and st.session_state.jpeg_bytes is None:
 
 if st.session_state.crop_image and st.session_state.canvas_box is None:
     st.subheader("🦷 Marque a região do periápice")
-    st.caption("Se o periápice não estiver visível, reinicie e envie nova imagem.")
     canvas_result = st_canvas(
         fill_color="rgba(255, 0, 0, 0.3)",
         stroke_width=3,
