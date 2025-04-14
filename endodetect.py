@@ -26,44 +26,102 @@ def compress_image(img: Image.Image, max_px=900, quality=75) -> bytes:
 def to_data_url(jpeg_bytes: bytes) -> str:
     return "data:image/jpeg;base64," + base64.b64encode(jpeg_bytes).decode()
 
-def enhance_xray(img: Image.Image) -> Image.Image:
-    gray = img.convert("L")
-    gray = ImageEnhance.Contrast(gray).enhance(1.15)
-    return gray.convert("RGB")
+def enhance_clahe(img: Image.Image) -> Image.Image:
+    gray = np.array(img.convert("L"))
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    cl = clahe.apply(gray)
+    return Image.fromarray(cl).convert("RGB")
 
-def build_message(texto: str) -> dict:
-    data_url = to_data_url(st.session_state.jpeg_bytes)
-    return {
-        "role": "user",
-        "content": [
-            {"type": "text", "text": texto},
-            {"type": "image_url", "image_url": {"url": data_url, "detail": "auto"}}
-        ]
-    }
+def enhance_laplacian(img: Image.Image) -> Image.Image:
+    gray = np.array(img.convert("L"))
+    lap = cv2.Laplacian(gray, cv2.CV_64F)
+    lap = cv2.convertScaleAbs(lap)
+    return Image.fromarray(lap).convert("RGB")
+
+def enhance_sobel(img: Image.Image) -> Image.Image:
+    gray = np.array(img.convert("L"))
+    sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
+    sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
+    sobel_combined = cv2.convertScaleAbs(cv2.magnitude(sobelx, sobely))
+    return Image.fromarray(sobel_combined).convert("RGB")
+
+def draw_custom_box(img: Image.Image, box_coords, color="red") -> Image.Image:
+    draw = ImageDraw.Draw(img)
+    draw.rectangle(box_coords, outline=color, width=4)
+    return img
+
+def build_message(texto: str) -> list:
+    user_data_url = to_data_url(st.session_state.jpeg_bytes)
+    return [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": texto},
+                {"type": "image_url", "image_url": {"url": user_data_url, "detail": "auto"}}
+            ]
+        }
+    ]
 
 # ---------- Prompt ----------
 SYSTEM_PROMPT = (
     "Você é o EndoDetectBot, um assistente virtual especializado em radiologia odontológica. "
     "Sua tarefa é avaliar radiografias periapicais fornecidas pelo usuário e fornecer uma interpretação sugestiva com base em padrões radiográficos visuais. "
-    "(1) 👁️‍🗨️ **Indício ou ausência de lesão periapical**; "
-    "(2) 📊 **Aspecto e localização.**; "
-    "(3) 🧾 **Orientação clínica geral** com base em boas práticas.** "
-    "Use termos como 'sugere-se', 'indicativos de', evitando afirmações absolutas. "
-    "Sempre tente realizar a avaliação com base na imagem recebida, mesmo que nem todos os detalhes estejam perfeitamente visíveis. "
-    "Se o periápice estiver parcialmente visível, realize a análise com base no que for possível observar. "
-    "Apenas quando o periápice estiver completamente ausente ou fora da área visível, oriente o reenvio da imagem solicitando que o campo selecionado durante o recorte seja maior. "
-    "Finalize com a ressalva de que a avaliação é sugestiva, é feita por uma inteligência artificial, podendo conter erros, e que o diagnóstico definitivo deve ser feito por um cirurgião-dentista."
+    "A imagem recebida é composta por quatro variações da mesma radiografia, dispostas lado a lado: "
+    "(1) imagem original, "
+    "(2) versão com realce adaptativo por CLAHE, "
+    "(3) versão com realce de bordas (Sobel), "
+    "(4) versão com filtro de textura (Gabor). "
+    "Utilize essas versões de forma complementar para auxiliar na detecção de sinais sutis de lesão periapical. "
+    "A área delimitada por um retângulo vermelho indica a região de interesse selecionada manualmente pelo usuário, geralmente envolvendo o periápice do dente. Concentre sua avaliação nessa área. "
+    "Sua resposta deve conter: "
+    "\n🦷**(1) Classificação Final:** indique se é normal, espessamento (leve ou moderado) ou lesão periapical. "
+    "\n🔍**(2) Grau de confiança:** alto, moderado ou baixo, com justificativa. "
+    "\n🧾**(3) Descrição da imagem:** localização e características observadas. "
+    "\n⚠️**(4) Achados adicionais (se houver):** como reabsorções, fraturas, extravasamento de material. "
+    "\n✅**(5) Orientação clínica:** recomendação baseada no achado. Sempre reforçando a necessidade da avaliação por um endodontista "
+    "Utilize linguagem técnica (por exemplo: 'sugere-se', 'há indicativos de') e evite afirmações absolutas. "
+    "Mesmo que a imagem não esteja perfeita, tente fornecer uma avaliação sugestiva com base nas evidências visuais disponíveis. "
+    "Finalize com a ressalva de que a análise é sugestiva, feita por uma inteligência artificial, podendo conter erros, "
+    "e que o diagnóstico definitivo deve ser realizado por um cirurgião-dentista após avaliação clínica completa."
+    "Lembre sempre dos exemplos que vou te passar para definir a resposta final, entre presença de lesão, espessamento (mesmo que leve) ou normalidade."
+    "Lesão periapical apresenta área radiolúcida bem delimitada na região apical; espessamento do ligamento periodontal mostra alargamento linear do espaço periodontal sem destruição óssea; já a normalidade do ligamento exibe espaço periodontal fino, contínuo e uniforme ao redor da raiz."
+    "A avaliação deve compreender a avaliação do ápice dentário (no caso de lesão periapical é onde estará localizada), e também de todo ligamento (para diferenciar espessamento de normalidade)."
+    "Você deve avaliar o ápice primeiro, para depois avaliar o restante do ligamento, antes da tomada de decisão."
+    "Realize uma análise reflexiva, como se você estivesse avaliando essa imagem três vezes em momentos diferentes. Reflita brevemente sobre possíveis variações nas interpretações, depois integre as conclusões em um único parecer com grau de confiança."
 )
+
+EXEMPLOS_FEWSHOT = [
+    {
+        "role": "user",
+        "content": [
+            {"type": "text", "text": "Exemplo de lesão periapical: radiolucidez apical com margens mal definidas, geralmente associada à necrose pulpar.Se houver presença de rarefação na raiz, é uma provável lesão periapical. Estou enviando 6 exemplos, eles estão demarcados no retângulo vermelho. Aprenda esse padrão"},
+            {"type": "image_url", "image_url": {"url": "https://raw.githubusercontent.com/cristianomaraujo/endo_detect_lesion/main/exemplo_lesao.jpg", "detail": "low"}}
+        ]
+    },
+    {
+        "role": "user",
+        "content": [
+            {"type": "text", "text": "Exemplos de espessamento do ligamento periodontal: faixa radiolúcida fina e uniforme, com margens definidas, podendo estar relacionada a trauma oclusal ou mobilidade dentária. Espaço do ligamento aumentado, mas sem rarefação, é indício de espessamento. Só fale que é espessamento, somente se o espaço estiver aumentado, caso contrário, indique normalidade. Estou enviando 5 exemplos, eles estão demarcados no retângulo vermelho. Aprenda esse padrão"},
+            {"type": "image_url", "image_url": {"url": "https://raw.githubusercontent.com/cristianomaraujo/endo_detect_lesion/main/exemplo_espessamento.jpg", "detail": "low"}}
+        ]
+    },
+    {
+        "role": "user",
+        "content": [
+            {"type": "text", "text": "Exemplo de estrutura normal: espaço do ligamento periodontal bem definido, de espessura regular e sem radiolucidez patológica. Estou enviando 6 exemplos, eles estão demarcados no retângulo vermelho. Aprenda esse padrão"},
+            {"type": "image_url", "image_url": {"url": "https://raw.githubusercontent.com/cristianomaraujo/endo_detect_lesion/main/exemplo_normal.jpg", "detail": "low"}}
+        ]
+    }
+]
 
 # ---------- Estado inicial ----------
 st.session_state.setdefault("history", [{"role": "system", "content": SYSTEM_PROMPT}])
 st.session_state.setdefault("jpeg_bytes", None)
-st.session_state.setdefault("crop_orig", None)
-st.session_state.setdefault("crop_enh", None)
-st.session_state.setdefault("await_choice", False)
+st.session_state.setdefault("crop_image", None)
+st.session_state.setdefault("canvas_box", None)
 st.session_state.setdefault("laudo_pronto", False)
 
-# ---------- Exibir logo ----------
+# ---------- Logo ----------
 st.markdown(
     """
     <div style='text-align: center; margin-bottom: 10px;'>
@@ -73,84 +131,84 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# ---------- Interface ----------
-# (Removido título)
-
+# ---------- Upload ----------
 uploaded = st.file_uploader("Radiografia periapical (JPG/PNG)", type=["jpg", "jpeg", "png"])
 
-# ---------- Etapa A: recorte ----------
-if uploaded and not st.session_state.await_choice and st.session_state.jpeg_bytes is None:
+if uploaded and st.session_state.jpeg_bytes is None:
     img_orig = Image.open(uploaded).convert("RGB")
-    st.write("🔍 Ajuste o retângulo vertical e clique em **Confirmar recorte**.")
-    cropped_img = st_cropper(
-        img_orig,
-        aspect_ratio=(2, 3),
-        box_color="#27AE60",
-        realtime_update=True,
-        return_type="image",
-        key="cropper"
-    )
-
+    st.write("🔍 Ajuste o recorte ao dente de interesse e clique em **Confirmar recorte**. A imagem deve conter toda **região periapical e o osso adjacente**, de forma que **possibilite a avaliação**")
+    cropped_img = st_cropper(img_orig, aspect_ratio=(2, 3), box_color="#27AE60", realtime_update=True, return_type="image", key="cropper")
     if st.button("Confirmar recorte"):
-        st.session_state.crop_orig = cropped_img
-        st.session_state.crop_enh = enhance_xray(cropped_img)
-        st.session_state.await_choice = True
+        st.session_state.crop_image = cropped_img
         st.experimental_rerun()
 
-# ---------- Etapa B: escolha da imagem ----------
-if st.session_state.await_choice:
-    col1, col2 = st.columns(2)
-    with col1:
-        st.image(st.session_state.crop_orig, caption="Original", use_column_width=True)
-    with col2:
-        st.image(st.session_state.crop_enh, caption="P&B + Contraste", use_column_width=True)
-
-    choice = st.radio("Qual versão deseja enviar?", ("Original", "P&B + Contraste"), key="radio_choice")
-    if st.button("Usar esta imagem"):
-        final_img = st.session_state.crop_enh if choice == "P&B + Contraste" else st.session_state.crop_orig
-        jpeg = compress_image(final_img)
-        size_mb = len(jpeg) / (1024 * 1024)
-
-        if size_mb > 4:
-            st.error("❌ Arquivo > 4 MB. Refaça o recorte ou envie uma imagem menor.")
+if st.session_state.crop_image and st.session_state.canvas_box is None:
+    st.subheader("🦷 Marque a região do periápice")
+    st.caption("Se o periápice não estiver visível, reinicie e envie nova imagem.")
+    canvas_result = st_canvas(
+        fill_color="rgba(255, 0, 0, 0.3)",
+        stroke_width=3,
+        stroke_color="#FF0000",
+        background_image=st.session_state.crop_image,
+        update_streamlit=True,
+        height=st.session_state.crop_image.height,
+        width=st.session_state.crop_image.width,
+        drawing_mode="rect",
+        key="canvas"
+    )
+    if st.button("Usar imagem com demarcação"):
+        if canvas_result.json_data and canvas_result.json_data["objects"]:
+            obj = canvas_result.json_data["objects"][0]
+            x, y, w, h = obj["left"], obj["top"], obj["width"], obj["height"]
+            box_coords = [(x, y), (x + w, y + h)]
+            clahe_img = enhance_clahe(st.session_state.crop_image.copy())
+            lap_img = enhance_laplacian(st.session_state.crop_image.copy())
+            sobel_img = enhance_sobel(st.session_state.crop_image.copy())
+            orig_boxed = draw_custom_box(st.session_state.crop_image.copy(), box_coords, color="red")
+            lap_boxed = draw_custom_box(lap_img.copy(), box_coords, color="yellow")
+            clahe_boxed = draw_custom_box(clahe_img.copy(), box_coords, color="blue")
+            sobel_boxed = draw_custom_box(sobel_img.copy(), box_coords, color="green")
+            total_width = orig_boxed.width * 4
+            new_img = Image.new("RGB", (total_width, orig_boxed.height))
+            new_img.paste(orig_boxed, (0, 0))
+            new_img.paste(lap_boxed, (orig_boxed.width, 0))
+            new_img.paste(clahe_boxed, (orig_boxed.width * 2, 0))
+            new_img.paste(sobel_boxed, (orig_boxed.width * 3, 0))
+            st.session_state.jpeg_bytes = compress_image(new_img)
+            st.session_state.canvas_box = new_img
+            st.success("✅ Imagem salva! Agora clique em **Gerar laudo**.")
         else:
-            st.session_state.jpeg_bytes = jpeg
-            st.session_state.await_choice = False
-            st.success("✅ Imagem salva! Agora clique em **Gerar avaliação**.")
-            st.experimental_rerun()
+            st.warning("⚠️ Marque uma região antes de continuar.")
 
 # ---------- Gerar laudo ----------
 if st.session_state.jpeg_bytes and not st.session_state.laudo_pronto:
-    if st.button("Gerar avaliação"):
-        texto = "Por favor, avalie a radiografia."
-        st.session_state.history.append(build_message(texto))
-
+    if st.button("Gerar laudo"):
+        texto = "Por favor, avalie a radiografia. Siga a estrutura solicitada, incluindo grau de confiança e achados adicionais."
+        mensagens = [st.session_state.history[0], *EXEMPLOS_FEWSHOT, *build_message(texto)]
         response = client.chat.completions.create(
             model="gpt-4o",
-            messages=st.session_state.history,
+            messages=mensagens,
             max_tokens=700,
             temperature=0.2
         )
-        st.session_state.history.append(
-            {"role": "assistant", "content": response.choices[0].message.content}
-        )
+        st.session_state.history.append(build_message(texto)[0])
+        st.session_state.history.append({"role": "assistant", "content": response.choices[0].message.content})
         st.session_state.laudo_pronto = True
         st.experimental_rerun()
 
-# ---------- Renderização após laudo ----------
+# ---------- Exibição do laudo ----------
 if st.session_state.laudo_pronto:
     for msg in st.session_state.history[1:]:
         if msg["role"] == "assistant":
             st.chat_message("assistant").markdown(msg["content"])
-        else:
-            if isinstance(msg["content"], list):
-                with st.chat_message("user"):
-                    st.write(msg["content"][0]["text"])
-                    st.image(msg["content"][1]["image_url"]["url"], caption="Radiografia enviada")
-            else:
-                st.chat_message("user").write(msg["content"])
+        elif isinstance(msg["content"], list):
+            with st.chat_message("user"):
+                for part in msg["content"]:
+                    if part["type"] == "text":
+                        st.markdown(part["text"])
+                    elif part["type"] == "image_url" and "exemplo_" not in part["image_url"]["url"]:
+                        st.image(part["image_url"]["url"], caption="Radiografia enviada")
 
-    # Campo de perguntas pós-laudo
     nova_pergunta = st.chat_input("❓ Tirar dúvidas sobre o laudo ou a lesão:")
     if nova_pergunta:
         st.session_state.history.append({"role": "user", "content": nova_pergunta})
@@ -160,13 +218,10 @@ if st.session_state.laudo_pronto:
             max_tokens=700,
             temperature=0.2
         )
-        st.session_state.history.append(
-            {"role": "assistant", "content": response.choices[0].message.content}
-        )
+        st.session_state.history.append({"role": "assistant", "content": response.choices[0].message.content})
         st.experimental_rerun()
 
-    # Botão para reiniciar
     if st.button("📤 Enviar nova imagem"):
-        for key in ["jpeg_bytes", "crop_orig", "crop_enh", "await_choice", "laudo_pronto"]:
+        for key in ["jpeg_bytes", "crop_image", "canvas_box", "laudo_pronto"]:
             st.session_state[key] = None
         st.experimental_rerun()
